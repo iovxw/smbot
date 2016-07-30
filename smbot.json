@@ -1,0 +1,8 @@
+{"host":"irc.freenode.net",
+ "port":6667,
+ "ssl":false,
+ "timeout":180,
+ "real-name":"smbot",
+ "nick":"iovxw",
+ "channels":["#42!"],
+ "data":{}}
