@@ -20,6 +20,15 @@
     (irc/message connection nick message)
     (irc/message connection target (str nick ":") message)))
 
+(defn rand-nth-n [coll n]
+  (let [coll (vec (set coll))]
+    (if (> (count coll) n)
+      (loop [result (set (take n (repeatedly #(rand-nth coll))))]
+        (if (= (count result) n)
+          result
+          (recur (conj result (rand-nth coll)))))
+      coll)))
+
 (defn callback [connection args]
   (future
     (let [{:keys [target nick text]} args]
@@ -41,7 +50,7 @@
        (let [key (keyword (second r))
              values (get (:data server) key)]
          (if values
-           (doseq [value values]
+           (doseq [value (rand-nth-n values 5)]
              (reply connection target nick value)
              (Thread/sleep 500))
            (reply connection target nick "not found")))))))
@@ -81,7 +90,6 @@
     (start)
     (loop []
       (Thread/sleep 100000)
-      ;(spit data-file (json/write-str server))
       (with-open [w (io/writer data-file :append false)]
         (binding [*out* w]
           (json/pprint server)))
