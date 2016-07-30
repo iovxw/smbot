@@ -17,13 +17,15 @@
       (println target nick text r)
       (let [[_ key new-value] r
             key (keyword key)
-            value (get (:data server) key)]
+            values (get (:data server) key)]
         (if new-value
-          (do (alter-var-root (var server)
-                              #(assoc-in % [:data key] (cons new-value value)))
-              (reply connection target nick "pushed!"))
-          (if value
-            (reply connection target nick (rand-nth value))
+          (if (some #(= % new-value) values)
+            (reply connection target nick "duplicate value")
+            (do (alter-var-root (var server)
+                                #(assoc-in % [:data key] (cons new-value values))
+                (reply connection target nick "pushed!")))
+          (if values
+            (reply connection target nick (rand-nth values))
             (reply connection target nick "not found")))))))
 
 (defn on-shutdown [connection]
