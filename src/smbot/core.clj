@@ -21,29 +21,30 @@
     (irc/message connection target (str nick ":") message)))
 
 (defn callback [connection args]
-  (let [{:keys [target nick text]} args]
-    (cond-let
-     [r (re-find #"\.sm ([^ ]+)(?: (.+))?" text)]
-     (let [[_ key new-value] r
-           key (keyword key)
-           values (get (:data server) key)]
-       (if new-value
-         (if (some #(= % new-value) values)
-           (reply connection target nick "duplicate value")
-           (do (alter-var-root (var server)
-                               #(assoc-in % [:data key] (cons new-value values)))
-               (reply connection target nick "pushed!")))
+  (future
+    (let [{:keys [target nick text]} args]
+      (cond-let
+       [r (re-find #"\.sm ([^ ]+)(?: (.+))?" text)]
+       (let [[_ key new-value] r
+             key (keyword key)
+             values (get (:data server) key)]
+         (if new-value
+           (if (some #(= % new-value) values)
+             (reply connection target nick "duplicate value")
+             (do (alter-var-root (var server)
+                                 #(assoc-in % [:data key] (cons new-value values)))
+                 (reply connection target nick "pushed!")))
+           (if values
+             (reply connection target nick (rand-nth values))
+             (reply connection target nick "not found"))))
+       [r (re-find #"\.small ([^ ]+)" text)]
+       (let [key (keyword (second r))
+             values (get (:data server) key)]
          (if values
-           (reply connection target nick (rand-nth values))
-           (reply connection target nick "not found"))))
-     [r (re-find #"\.small ([^ ]+)" text)]
-     (let [key (keyword (second r))
-           values (get (:data server) key)]
-       (if values
-         (doseq [value values]
-           (reply connection target nick value)
-           (Thread/sleep 500))
-         (reply connection target nick "not found"))))))
+           (doseq [value values]
+             (reply connection target nick value)
+             (Thread/sleep 500))
+           (reply connection target nick "not found")))))))
 
 (defn on-shutdown [connection]
   (irc/kill connection)
