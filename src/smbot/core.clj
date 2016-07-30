@@ -22,7 +22,7 @@
           (if (some #(= % new-value) values)
             (reply connection target nick "duplicate value")
             (do (alter-var-root (var server)
-                                #(assoc-in % [:data key] (cons new-value values))
+                                #(assoc-in % [:data key] (cons new-value values)))
                 (reply connection target nick "pushed!")))
           (if values
             (reply connection target nick (rand-nth values))
