@@ -6,15 +6,6 @@
 
 (declare server start)
 
-(defmacro cond-let [& clauses]
-  (when clauses
-    (if (= (first clauses) :else)
-      (second clauses)
-      `(let ~(first clauses)
-         (if ~(first (first clauses))
-           ~(second clauses)
-           ~(cons 'cond-let (next (next clauses))))))))
-
 (defn reply [connection target nick message]
   (if (= target (:nick @connection))
     (irc/message connection nick message)
@@ -29,26 +20,39 @@
           (recur (conj result (rand-nth coll)))))
       coll)))
 
+(defmacro match-cmd [msg & clauses]
+  (when clauses
+    (let [m (first clauses)
+          regex (first m)
+          v (gensym 'v)
+          values (vec (cons '_ (next m)))]
+      `(let [~v (re-find ~regex (:text ~msg))]
+         (if ~v
+           (let [~values ~v]
+             ~(second clauses))
+           (match-cmd ~msg ~@(next (next clauses))))))))
+
 (defn callback [connection args]
   (future
     (let [{:keys [target nick text]} args]
-      (cond-let
-       [r (re-find #"\.sm ([^ ]+)(?: (.+))?" text)]
-       (let [[_ key new-value] r
-             key (keyword key)
+      (match-cmd args
+       [#"\.sm ([^ ]+) *$" key]
+       (let [values (get (:data server) (keyword key))]
+         (if values
+           (reply connection target nick (rand-nth values))
+           (reply connection target nick "not found")))
+
+       [#"\.sm ([^ ]+) (.+)" key new-value]
+       (let [key (keyword key)
              values (get (:data server) key)]
-         (if new-value
-           (if (some #(= % new-value) values)
-             (reply connection target nick "duplicate value")
-             (do (alter-var-root (var server)
-                                 #(assoc-in % [:data key] (cons new-value values)))
-                 (reply connection target nick "pushed!")))
-           (if values
-             (reply connection target nick (rand-nth values))
-             (reply connection target nick "not found"))))
-       [r (re-find #"\.small ([^ ]+)" text)]
-       (let [key (keyword (second r))
-             values (get (:data server) key)]
+         (if (some #(= % new-value) values)
+           (reply connection target nick "duplicate value")
+           (do (alter-var-root (var server)
+                               #(assoc-in % [:data key] (cons new-value values)))
+               (reply connection target nick "pushed!"))))
+
+       [#"\.small ([^ ]+) *$" key]
+       (let [values (get (:data server) (keyword key))]
          (if values
            (doseq [value (rand-nth-n values 5)]
              (reply connection target nick value)
